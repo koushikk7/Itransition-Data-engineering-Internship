@@ -1,1 +1,20 @@
+Bookstore Analytics Dashboard (Task 4)
+This solution processes raw bookstore data (YAML, Parquet, CSV), resolves user identities using graph logic, and visualizes sales trends.
 
+How to Run
+
+Install dependencies:
+pip install -r requirements.txt
+
+Launch the dashboard:
+streamlit run dashboard.py
+
+Verification Scripts
+To ensure the dashboard numbers are accurate, I wrote three standalone scripts to cross-check the logic against the raw data.
+
+Dashboard Screenshots
+In case the live server is unavailable, I have included full-page screenshots of the results for all three datasets in the dashboard_images/ folder:
+
+DATA1_dashboard.png
+DATA2_dashboard.png
+DATA3_dashboard.png
