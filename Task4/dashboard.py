@@ -103,7 +103,7 @@ def load_and_process_data(folder_name):
     folder_path = base_path / folder_name
     
     try:
-        books = parse_books_yml(str(folder_path / "books.yaml"))
+        books = parse_books_yaml(str(folder_path / "books.yaml"))
         orders = pd.read_parquet(str(folder_path / "orders.parquet"))
         users = pd.read_csv(str(folder_path / "users.csv"))
     except Exception as e:
