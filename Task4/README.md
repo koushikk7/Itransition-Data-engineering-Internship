@@ -1,6 +1,6 @@
 # Bookstore Analytics Dashboard (Task 4)
 
-This solution processes raw bookstore data—**YAML**, **Parquet**, and **CSV**—resolves user identities using graph logic, and visualizes sales trends via an interactive dashboard.
+This solution processes raw bookstore data **YAML**, **Parquet**, and **CSV**—resolves user identities using graph logic, and visualizes sales trends via an interactive dashboard.
 
 ---
 
@@ -20,34 +20,17 @@ This solution processes raw bookstore data—**YAML**, **Parquet**, and **CSV**�
 
 ## Verification Scripts
 
-To ensure accuracy, three standalone scripts are provided. These cross-check dashboard logic using the original raw data.
+To ensure accuracy, three standalone scripts are provided. These cross check dashboard logic using the original raw data.
 
 ---
 
 ## Dashboard Screenshots
 
-If the live server is unavailable, view the full-page results in the `dashboard_images/` folder:
+If the live server is unavailable for some reason, view the full-page results in the `dashboard_images/` folder:
 
 - `DATA1_dashboard.png`
 - `DATA2_dashboard.png`
 - `DATA3_dashboard.png`
-
----
-
-### Folder Structure
-
-```
-dashboard.py
-requirements.txt
-dashboard_images/
-    ├── DATA1_dashboard.png
-    ├── DATA2_dashboard.png
-    └── DATA3_dashboard.png
-verification_scripts/
-    ├── verify_yaml.py
-    ├── verify_parquet.py
-    └── verify_csv.py
-```
 
 ---
 
