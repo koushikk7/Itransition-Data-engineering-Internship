@@ -14,7 +14,7 @@ if css_file.exists():
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 
-def parse_books_yml(filepath):
+def parse_books_yaml(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
     content = re.sub(r':(\w+)', r'\1', content)
