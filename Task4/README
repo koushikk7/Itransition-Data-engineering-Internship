@@ -1,20 +1,58 @@
-Bookstore Analytics Dashboard (Task 4)
-This solution processes raw bookstore data (YAML, Parquet, CSV), resolves user identities using graph logic, and visualizes sales trends.
+# Bookstore Analytics Dashboard (Task 4)
 
-How to Run
+This solution processes raw bookstore data—**YAML**, **Parquet**, and **CSV**—resolves user identities using graph logic, and visualizes sales trends via an interactive dashboard.
 
-Install dependencies:
-pip install -r requirements.txt
+---
 
-Launch the dashboard:
-streamlit run dashboard.py
+## How to Run
 
-Verification Scripts
-To ensure the dashboard numbers are accurate, I wrote three standalone scripts to cross-check the logic against the raw data.
+1. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Dashboard Screenshots
-In case the live server is unavailable, I have included full-page screenshots of the results for all three datasets in the dashboard_images/ folder:
+2. **Launch the dashboard**
+   ```bash
+   streamlit run dashboard.py
+   ```
 
-DATA1_dashboard.png
-DATA2_dashboard.png
-DATA3_dashboard.png
+---
+
+## Verification Scripts
+
+To ensure accuracy, three standalone scripts are provided. These cross-check dashboard logic using the original raw data.
+
+---
+
+## Dashboard Screenshots
+
+If the live server is unavailable, view the full-page results in the `dashboard_images/` folder:
+
+- `DATA1_dashboard.png`
+- `DATA2_dashboard.png`
+- `DATA3_dashboard.png`
+
+---
+
+### Folder Structure
+
+```
+dashboard.py
+requirements.txt
+dashboard_images/
+    ├── DATA1_dashboard.png
+    ├── DATA2_dashboard.png
+    └── DATA3_dashboard.png
+verification_scripts/
+    ├── verify_yaml.py
+    ├── verify_parquet.py
+    └── verify_csv.py
+```
+
+---
+
+### Key Features
+
+- **Multi-format data support** (YAML, Parquet, CSV)
+- **Identity resolution via graph logic**
+- **Sales analytics & visualization**
