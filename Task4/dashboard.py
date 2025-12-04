@@ -100,7 +100,7 @@ def normalize_authors(auth_str):
 
 def load_and_process_data(folder_name):
     try:
-        books = parse_books_yml(f"{folder_name}/books.yaml")
+        books = parse_books_yaml(f"{folder_name}/books.yaml")
         orders = pd.read_parquet(f"{folder_name}/orders.parquet")
         users = pd.read_csv(f"{folder_name}/users.csv")
     except Exception as e:
