@@ -1,0 +1,117 @@
+.stApp {
+    background-color: #000000 !important;
+    color: #ffffff;
+}
+
+.main .block-container {
+    background-color: #000000 !important;
+}
+
+[data-testid="stAppViewContainer"] {
+    background-color: #000000 !important;
+}
+
+[data-testid="stHeader"] {
+    background-color: #000000 !important;
+}
+
+section[data-testid="stSidebar"] > div {
+    background-color: #000000 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #00ff00 !important;
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #aaaaaa;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+[data-testid="stMetricDelta"] {
+    color: #00ff00;
+}
+
+.stTabs {
+    background-color: transparent;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background-color: transparent;
+    border-bottom: 1px solid #333333;
+    padding: 0;
+    margin: 0;
+}
+
+.stTabs [data-baseweb="tab"] {
+    height: 45px;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    color: #666666;
+    padding: 12px 24px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+    background-color: transparent;
+    color: #999999;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: transparent;
+    color: #00ff00;
+    border-bottom: 2px solid #00ff00;
+}
+
+.stContainer {
+    background-color: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.stAlert {
+    background-color: #0f0f0f;
+    border-left: 4px solid #00ff00;
+    color: #ffffff;
+}
+
+code {
+    background-color: #0f0f0f !important;
+    color: #00ff00 !important;
+    border: 1px solid #222222 !important;
+    padding: 12px !important;
+    border-radius: 6px !important;
+}
+
+[data-testid="stDataFrame"] {
+    background-color: #0a0a0a;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #000000 !important;
+    border-right: 1px solid #1a1a1a;
+}
+
+hr {
+    margin: 20px 0;
+    border: none;
+    border-top: 1px solid #333333;
+}
+
+[data-testid="stPlotlyChart"] {
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
