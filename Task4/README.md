@@ -18,6 +18,13 @@ This solution processes raw bookstore data **YAML**, **Parquet**, and **CSV**—
 
 ---
 
+## Live Dashboard Access
+
+You can access the deployed dashboard here:  
+[https://bookstore-analytics-koushik.streamlit.app/](https://bookstore-analytics-koushik.streamlit.app/)
+
+---
+
 ## Verification Scripts
 
 Three scripts that cross check dashboard logic using the original raw data.
