@@ -99,18 +99,22 @@ def normalize_authors(auth_str):
 
 
 def load_and_process_data(folder_name):
+    base_path = Path(__file__).parent
+    folder_path = base_path / folder_name
+    
     try:
-        books = parse_books_yaml(f"{folder_name}/books.yaml")
-        orders = pd.read_parquet(f"{folder_name}/orders.parquet")
-        users = pd.read_csv(f"{folder_name}/users.csv")
+        books = parse_books_yml(str(folder_path / "books.yaml"))
+        orders = pd.read_parquet(str(folder_path / "orders.parquet"))
+        users = pd.read_csv(str(folder_path / "users.csv"))
     except Exception as e:
         st.error(f"Error loading {folder_name}: {e}")
+        st.error(f"Looking in: {folder_path}")
         return None
 
     if orders.empty:
         st.warning(f"No orders found in {folder_name}")
         return None
-
+        
     orders['date_obj'] = parse_custom_dates(orders['timestamp'])
     orders['date_str'] = orders['date_obj'].dt.strftime('%Y-%m-%d')
     orders['clean_price'] = orders['unit_price'].apply(clean_price)
@@ -269,3 +273,8 @@ with tab2:
 
 with tab3:
     render_tab("DATA3")
+
+
+
+
+ 
