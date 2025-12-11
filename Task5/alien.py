@@ -189,12 +189,16 @@ def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_path):
 def main():
     st.title("🏭 Weyland-Yutani Ops Simulator")
     
+    # Session State: Cache Buster for Data
     if 'buster' not in st.session_state:
         st.session_state['buster'] = time.time()
 
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear() 
         st.session_state['buster'] = time.time() 
+        # Also clear old PDF if data refreshes
+        if 'pdf_bytes' in st.session_state:
+            del st.session_state['pdf_bytes']
         st.rerun()
 
     final_url = f"{SHEET_URL}&t={st.session_state['buster']}"
@@ -274,35 +278,46 @@ def main():
     fig.update_layout(plot_bgcolor='black', paper_bgcolor='black', font_color='white', xaxis_showgrid=False, yaxis_gridcolor='#333333', height=450)
     st.plotly_chart(fig, use_container_width=True)
 
-    # Export
+    # --- PDF EXPORT LOGIC (FIXED) ---
     if st.button("📄 Generate PDF Report (Current View)"):
-        try:
-            stats_data = {
-                'mean': data.mean(), 'std': data.std(), 'median': data.median(),
-                'iqr': np.percentile(data, 75) - np.percentile(data, 25), 'count': len(data)
-            }
-            
-            table_data = []
-            for idx, row in anomaly_points.iterrows():
-                reasons = []
-                if anomalies_iqr[idx]: reasons.append("IQR")
-                if anomalies_z[idx]: reasons.append("Z-Score")
-                if anomalies_ma[idx]: reasons.append("MA")
-                if anomalies_grubbs[idx]: reasons.append("Grubbs")
+        with st.spinner("Generating Report..."):
+            try:
+                stats_data = {
+                    'mean': data.mean(), 'std': data.std(), 'median': data.median(),
+                    'iqr': np.percentile(data, 75) - np.percentile(data, 25), 'count': len(data)
+                }
                 
-                table_data.append([
-                    row['Date'].strftime('%Y-%m-%d'),
-                    f"{row[target_col]:.2f}",
-                    ", ".join(reasons)
-                ])
+                table_data = []
+                for idx, row in anomaly_points.iterrows():
+                    reasons = []
+                    if anomalies_iqr[idx]: reasons.append("IQR")
+                    if anomalies_z[idx]: reasons.append("Z-Score")
+                    if anomalies_ma[idx]: reasons.append("MA")
+                    if anomalies_grubbs[idx]: reasons.append("Grubbs")
+                    
+                    table_data.append([
+                        row['Date'].strftime('%Y-%m-%d'),
+                        f"{row[target_col]:.2f}",
+                        ", ".join(reasons)
+                    ])
 
-            chart_path = create_static_chart(df, target_col, anomaly_points, chart_type, poly_degree)
-            pdf_bytes = generate_pdf(df, target_col, stats_data, table_data, chart_path)
-            
-            st.download_button(f"Download PDF ({target_col})", pdf_bytes, f"mining_report_{target_col}.pdf", "application/pdf")
-            if os.path.exists(chart_path): os.remove(chart_path)
-        except Exception as e:
-            st.error(f"Failed to generate PDF: {e}")
+                chart_path = create_static_chart(df, target_col, anomaly_points, chart_type, poly_degree)
+                
+                # SAVE TO SESSION STATE
+                st.session_state['pdf_bytes'] = generate_pdf(df, target_col, stats_data, table_data, chart_path)
+                
+                if os.path.exists(chart_path): os.remove(chart_path)
+                
+            except Exception as e:
+                st.error(f"Failed to generate PDF: {e}")
 
-if __name__ == "__main__":
-    main()
+    # DISPLAY DOWNLOAD BUTTON IF READY
+    if 'pdf_bytes' in st.session_state:
+        st.success("Report Ready!")
+        st.download_button(
+            label=f"⬇️ Download PDF ({target_col})", 
+            data=st.session_state['pdf_bytes'], 
+            file_name=f"mining_report_{target_col}.pdf", 
+            mime="application/pdf"
+        )
+
