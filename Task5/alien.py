@@ -9,7 +9,7 @@ import tempfile
 import os
 import time
 
-# Set Matplotlib to non-GUI mode
+# Set Matplotlib to non-GUI mode to prevent crashes on server
 plt.switch_backend('Agg')
 
 # --- CONFIGURATION & CSS ---
@@ -53,15 +53,19 @@ st.markdown("""
 SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQceXReuRkxkGqRnEoGGPgaOhhHDQxzaBWRjd0cmdDr7Ffm_tLvBgcx-g84zgiUJBaG6oVCF8mgCLNw/pub?gid=0&single=true&output=csv"
 
 # --- DATA LOADER (PERSISTENT CACHE) ---
+# This ensures data does NOT reload when sliders move
+# It only reloads when the URL changes (via the Refresh button)
 @st.cache_data(show_spinner=True)
 def load_data(url):
     try:
         df = pd.read_csv(url)
         
-        # Date Parsing
+        # Date Parsing (Handle Excel Serial Numbers vs Strings)
         if pd.api.types.is_numeric_dtype(df['Date']):
+            # Excel Serial Date (days since Dec 30, 1899)
             df['Date'] = pd.to_datetime(df['Date'], unit='D', origin='1899-12-30')
         else:
+            # String Date
             df['Date'] = pd.to_datetime(df['Date'])
             
         return df
@@ -80,6 +84,7 @@ def detect_outliers_zscore(data, threshold=3):
 
 def detect_outliers_moving_avg(data, window=7, threshold_percent=20):
     ma = data.rolling(window=window).mean().fillna(method='bfill')
+    # Avoid div by zero
     return (np.abs(data - ma) / ma.replace(0, 1) * 100) > threshold_percent
 
 def detect_outliers_grubbs(data, alpha=0.05):
@@ -88,11 +93,12 @@ def detect_outliers_grubbs(data, alpha=0.05):
     g_crit = ((n - 1) * np.sqrt(np.square(stats.t.ppf(1 - alpha / (2 * n), n - 2)))) / (np.sqrt(n) * np.sqrt(n - 2 + np.square(stats.t.ppf(1 - alpha / (2 * n), n - 2))))
     return (np.abs(data - np.mean(data)) / std) > g_crit
 
-# --- CHART FOR PDF ---
+# --- CHART FOR PDF (MATPLOTLIB) ---
 def create_static_chart(df, col_name, anomalies, chart_type, poly_degree):
     fig, ax = plt.subplots(figsize=(10, 5))
     x_nums = np.arange(len(df))
     
+    # Main Data
     if chart_type == "Bar":
         ax.bar(df['Date'], df[col_name], color='green', alpha=0.7, label='Output')
     elif chart_type == "Area":
@@ -101,14 +107,17 @@ def create_static_chart(df, col_name, anomalies, chart_type, poly_degree):
     else:
         ax.plot(df['Date'], df[col_name], color='green', label='Output')
 
+    # Moving Average (Pink)
     ma_7 = df[col_name].rolling(window=7).mean()
     ax.plot(df['Date'], ma_7, color='magenta', linewidth=2, label='Moving Avg (7-Day)')
 
+    # Polynomial Trend (Blue Dashed)
     if len(df) > poly_degree:
         z = np.polyfit(x_nums, df[col_name], poly_degree)
         p = np.poly1d(z)
         ax.plot(df['Date'], p(x_nums), color='blue', linestyle='--', linewidth=1.5, label=f'Trend (Deg {poly_degree})')
 
+    # Anomalies
     if not anomalies.empty:
         ax.scatter(anomalies['Date'], anomalies[col_name], color='red', marker='x', s=50, label='Anomaly', zorder=5)
 
@@ -119,13 +128,11 @@ def create_static_chart(df, col_name, anomalies, chart_type, poly_degree):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(temp_file.name, format='png', dpi=100)
     plt.close(fig)
-    temp_file.close() # <--- CRITICAL FIX FOR LINUX
     return temp_file.name
 
 # --- PDF GENERATOR ---
 class PDFReport(FPDF):
     def header(self):
-        # CHANGED TO HELVETICA (Safe for Linux)
         self.set_font('Helvetica', 'B', 16)
         self.cell(0, 10, 'Mining Operations Report', 0, 1, 'C')
         self.ln(5)
@@ -179,7 +186,6 @@ def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_path):
     else:
         pdf.chapter_body("No anomalies detected.")
 
-    # Robust Byte Return
     try:
         return bytes(pdf.output(dest='S').encode('latin-1', 'replace'))
     except:
@@ -189,18 +195,20 @@ def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_path):
 def main():
     st.title("🏭 Weyland-Yutani Ops Simulator")
     
-    # Session State: Cache Buster for Data
+    # Session State for Cache Busting & PDF Persistence
     if 'buster' not in st.session_state:
         st.session_state['buster'] = time.time()
 
+    # The Refresh Button generates a NEW timestamp
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear() 
-        st.session_state['buster'] = time.time() 
-        # Also clear old PDF if data refreshes
+        st.session_state['buster'] = time.time()
+        # Clear old PDF on refresh
         if 'pdf_bytes' in st.session_state:
             del st.session_state['pdf_bytes']
         st.rerun()
 
+    # Load Data using the SAVED timestamp (so sliders don't reload data)
     final_url = f"{SHEET_URL}&t={st.session_state['buster']}"
     df = load_data(final_url)
     if df is None: return
@@ -215,6 +223,7 @@ def main():
     poly_degree = st.sidebar.slider("Trendline Degree", 1, 4, 3) 
     
     st.sidebar.markdown("### ⚠️ Thresholds")
+    # Moving these sliders only re-runs the math, NOT the data download
     iqr_factor = st.sidebar.slider("IQR Factor", 1.0, 3.0, 1.5)
     z_thresh = st.sidebar.slider("Z-Score", 1.0, 5.0, 3.0)
     ma_thresh = st.sidebar.slider("Moving Avg Deviation %", 10, 100, 30)
@@ -237,6 +246,7 @@ def main():
     
     data = df[target_col]
     
+    # Math Logic (Fast)
     anomalies_iqr = detect_outliers_iqr(data, iqr_factor)
     anomalies_z = detect_outliers_zscore(data, z_thresh)
     anomalies_ma = detect_outliers_moving_avg(data, 7, ma_thresh)
@@ -245,17 +255,19 @@ def main():
     all_anomalies = anomalies_iqr | anomalies_z | anomalies_ma | anomalies_grubbs
     anomaly_points = df[all_anomalies]
 
-    # Metrics
+    # --- KEY METRICS ROW ---
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Mean Output", f"{data.mean():.1f}")
     c2.metric("Std Dev", f"{data.std():.1f}")
     c3.metric("Median", f"{data.median():.1f}")
+    # This number will update instantly when you move sliders!
     c4.metric("Anomalies Detected", f"{len(anomaly_points)}") 
 
     # Plotly Chart
     st.subheader("Production Timeline")
     fig = go.Figure()
     
+    # 1. Main Data
     if chart_type == "Line":
         fig.add_trace(go.Scatter(x=df['Date'], y=data, mode='lines', name='Output', line=dict(color='#00ff00')))
     elif chart_type == "Area":
@@ -263,15 +275,18 @@ def main():
     else:
         fig.add_trace(go.Bar(x=df['Date'], y=data, name='Output', marker_color='#00ff00'))
         
+    # 2. Moving Average (Pink)
     df['MA_7'] = data.rolling(window=7).mean()
     fig.add_trace(go.Scatter(x=df['Date'], y=df['MA_7'], mode='lines', name='Moving Avg (7-Day)', line=dict(color='#ff00ff', width=2)))
 
+    # 3. Polynomial Trendline (Yellow - High Visibility)
     x_nums = np.arange(len(df))
     if len(df) > poly_degree:
         z = np.polyfit(x_nums, data, poly_degree)
         p = np.poly1d(z)
         fig.add_trace(go.Scatter(x=df['Date'], y=p(x_nums), mode='lines', name=f'Trend (Deg {poly_degree})', line=dict(color='yellow', dash='dash', width=2)))
 
+    # 4. Anomalies
     if not anomaly_points.empty:
         fig.add_trace(go.Scatter(x=anomaly_points['Date'], y=anomaly_points[target_col], mode='markers', name='Anomaly', marker=dict(color='red', size=8, symbol='x')))
     
@@ -321,3 +336,5 @@ def main():
             mime="application/pdf"
         )
 
+if __name__ == "__main__":
+    main()
