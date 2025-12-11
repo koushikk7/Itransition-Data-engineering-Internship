@@ -54,7 +54,6 @@ def detect_outliers_zscore(data, threshold=3):
 
 def detect_outliers_moving_avg(data, window=7, threshold_percent=20):
     ma = data.rolling(window=window).mean().fillna(method='bfill')
-    # Use replace to avoid division by zero
     return (np.abs(data - ma) / ma.replace(0, 1) * 100) > threshold_percent
 
 def detect_outliers_grubbs(data, alpha=0.05):
@@ -91,58 +90,73 @@ def create_static_chart(df, col_name, anomalies, chart_type, poly_degree):
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(temp_file.name, format='png', dpi=100)
+    # Use BytesIO instead of temp file for better compatibility
+    from io import BytesIO
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
     plt.close(fig)
-    temp_file.close() # <--- FIXED: Explicit close to prevent locking
-    return temp_file.name
+    buf.seek(0)
+    return buf
 
 # --- PDF GENERATOR ---
 class PDFReport(FPDF):
     def header(self):
-        self.set_font('Helvetica', 'B', 16)
+        self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'Mining Operations Report', 0, 1, 'C')
         self.ln(5)
 
     def chapter_title(self, title):
-        self.set_font('Helvetica', 'B', 12)
+        self.set_font('Arial', 'B', 12)
         self.set_fill_color(220, 220, 220)
         self.cell(0, 8, title, 0, 1, 'L', 1)
         self.ln(4)
 
     def chapter_body(self, text):
-        self.set_font('Helvetica', '', 10)
+        self.set_font('Arial', '', 10)
         self.multi_cell(0, 6, text)
         self.ln()
 
     def create_table(self, header, data):
-        self.set_font('Helvetica', 'B', 10)
+        self.set_font('Arial', 'B', 10)
         self.set_fill_color(240, 240, 240)
         w = [40, 30, 120] 
         for i, h in enumerate(header):
             self.cell(w[i], 8, h, 1, 0, 'C', 1)
         self.ln()
-        self.set_font('Helvetica', '', 9)
+        self.set_font('Arial', '', 9)
         for row in data:
             self.cell(w[0], 7, str(row[0]), 1, 0, 'C')
             self.cell(w[1], 7, str(row[1]), 1, 0, 'R')
             self.cell(w[2], 7, str(row[2]), 1, 0, 'L')
             self.ln()
 
-def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_path):
+def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_buffer):
     pdf = PDFReport()
     pdf.add_page()
     
     pdf.chapter_title(f"1. Operational Statistics ({target_col})")
     text = f"""Mean Daily Output: {stats_dict['mean']:.2f}
-    Standard Deviation: {stats_dict['std']:.2f}
-    Median Output: {stats_dict['median']:.2f}
-    Interquartile Range: {stats_dict['iqr']:.2f}
-    Total Days Recorded: {stats_dict['count']}"""
+Standard Deviation: {stats_dict['std']:.2f}
+Median Output: {stats_dict['median']:.2f}
+Interquartile Range: {stats_dict['iqr']:.2f}
+Total Days Recorded: {stats_dict['count']}"""
     pdf.chapter_body(text)
 
     pdf.chapter_title("2. Visual Analysis")
-    pdf.image(chart_path, x=10, w=190)
+    
+    # Save buffer to temp file for FPDF (it doesn't accept BytesIO directly)
+    temp_path = tempfile.mktemp(suffix='.png')
+    with open(temp_path, 'wb') as f:
+        f.write(chart_buffer.getvalue())
+    
+    pdf.image(temp_path, x=10, w=190)
+    
+    # Clean up temp file
+    try:
+        os.remove(temp_path)
+    except:
+        pass
+    
     pdf.ln(5)
     
     pdf.add_page()
@@ -152,10 +166,8 @@ def generate_pdf(df, target_col, stats_dict, anomalies_data, chart_path):
     else:
         pdf.chapter_body("No anomalies detected.")
 
-    try:
-        return bytes(pdf.output(dest='S').encode('latin-1', 'replace'))
-    except:
-        return bytes(pdf.output())
+    # Return bytes directly
+    return pdf.output(dest='S')
 
 # --- MAIN APP ---
 def main():
@@ -167,9 +179,10 @@ def main():
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear() 
         st.session_state['buster'] = time.time()
-        # Reset PDF state on refresh
-        if 'pdf_bytes' in st.session_state:
-            del st.session_state['pdf_bytes']
+        # Clear PDF state on refresh
+        for key in ['pdf_bytes', 'pdf_ready', 'pdf_filename']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
 
     final_url = f"{SHEET_URL}&t={st.session_state['buster']}"
@@ -177,8 +190,12 @@ def main():
     if df is None: return
 
     # Filter columns
-    wanted_cols = ['LV_426', 'Origae_6', 'Fiorina_151', 'Total_Output']
+    wanted_cols = ['LV_426', 'Origae_6', 'Fiorina_161', 'Total_Output']
     available_cols = [c for c in df.columns if c in wanted_cols]
+    
+    if not available_cols:
+        st.error("No valid mine columns found!")
+        return
     
     # Sidebar
     st.sidebar.markdown("### ⚙️ View Settings")
@@ -249,48 +266,55 @@ def main():
     fig.update_layout(plot_bgcolor='black', paper_bgcolor='black', font_color='white', xaxis_showgrid=False, yaxis_gridcolor='#333333', height=450)
     st.plotly_chart(fig, use_container_width=True)
 
-    # PDF Logic
-    if st.button("📄 Generate PDF Report (Current View)"):
-        with st.spinner("Generating Report..."):
-            try:
-                stats_data = {
-                    'mean': data.mean(), 'std': data.std(), 'median': data.median(),
-                    'iqr': np.percentile(data, 75) - np.percentile(data, 25), 'count': len(data)
-                }
-                
-                table_data = []
-                for idx, row in anomaly_points.iterrows():
-                    reasons = []
-                    if anomalies_iqr[idx]: reasons.append("IQR")
-                    if anomalies_z[idx]: reasons.append("Z-Score")
-                    if anomalies_ma[idx]: reasons.append("MA")
-                    if anomalies_grubbs[idx]: reasons.append("Grubbs")
-                    
-                    table_data.append([
-                        row['Date'].strftime('%Y-%m-%d'),
-                        f"{row[target_col]:.2f}",
-                        ", ".join(reasons)
-                    ])
-
-                chart_path = create_static_chart(df, target_col, anomaly_points, chart_type, poly_degree)
-                
-                # Store in session state
-                st.session_state['pdf_bytes'] = generate_pdf(df, target_col, stats_data, table_data, chart_path)
-                
-                if os.path.exists(chart_path): os.remove(chart_path)
-            except Exception as e:
-                st.error(f"PDF Gen Error: {e}")
-
-    # Persistent Download Button
-    if 'pdf_bytes' in st.session_state:
-        st.success("Report Ready!")
-        st.download_button(
-            label="⬇️ Click Here to Download PDF",
-            data=st.session_state['pdf_bytes'],
-            file_name=f"mining_report_{target_col}.pdf",
-            mime="application/pdf",
-            key='download_pdf_btn' # Unique key
-        )
+    # PDF Generation - FIREFOX-COMPATIBLE
+    st.markdown("---")
+    
+    # Build PDF data first
+    stats_data = {
+        'mean': data.mean(), 
+        'std': data.std(), 
+        'median': data.median(),
+        'iqr': np.percentile(data, 75) - np.percentile(data, 25), 
+        'count': len(data)
+    }
+    
+    table_data = []
+    for idx, row in anomaly_points.iterrows():
+        reasons = []
+        if anomalies_iqr[idx]: reasons.append("IQR")
+        if anomalies_z[idx]: reasons.append("Z-Score")
+        if anomalies_ma[idx]: reasons.append("MA")
+        if anomalies_grubbs[idx]: reasons.append("Grubbs")
+        
+        table_data.append([
+            row['Date'].strftime('%Y-%m-%d'),
+            f"{row[target_col]:.2f}",
+            ", ".join(reasons)
+        ])
+    
+    # Generate chart buffer
+    chart_buffer = create_static_chart(df, target_col, anomaly_points, chart_type, poly_degree)
+    
+    # Generate PDF
+    pdf_output = generate_pdf(df, target_col, stats_data, table_data, chart_buffer)
+    
+    # Convert to bytes if needed
+    if isinstance(pdf_output, str):
+        pdf_bytes = pdf_output.encode('latin-1')
+    else:
+        pdf_bytes = pdf_output
+    
+    filename = f"mining_report_{target_col}_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
+    
+    # Direct download button (works in all browsers)
+    st.download_button(
+        label="📄 Generate & Download PDF Report",
+        data=pdf_bytes,
+        file_name=filename,
+        mime="application/pdf",
+        type="primary",
+        use_container_width=False
+    )
 
 if __name__ == "__main__":
     main()
