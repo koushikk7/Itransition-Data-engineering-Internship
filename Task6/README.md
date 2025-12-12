@@ -78,8 +78,8 @@ RETURNS TABLE (
 
 ## Example call
 ```sql
-SELECT * FROM generate_fake_people(12345, 1000, 'en_US', 0);
+SELECT * FROM generate_fake_people(66667, 1000, 'en_US', 0);
 ```
-This returns 1,000 deterministic fake users for the `en_US` locale using seed 12345.
+This returns 1,000 deterministic fake users for the `en_US` locale using seed 66667.
 
 ---
