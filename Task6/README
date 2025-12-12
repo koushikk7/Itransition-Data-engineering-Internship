@@ -1,1 +1,66 @@
+---
 
+# Task 6: Documentation
+
+## Overview
+This project implements a high-performance, deterministic fake data generator residing entirely within **PostgreSQL Stored Procedures**. It generates realistic user profiles (names, addresses, PII, biometrics, and geolocation) without relying on external application logic.
+
+## 1. Stored Procedure Interface
+
+### `generate_fake_people`
+The main entry point for data generation. It returns a table of generated users.
+
+**Signature:**
+```sql
+FUNCTION generate_fake_people(
+    input_seed INT,      -- Base seed for deterministic generation
+    batch_size INT,      -- Number of rows to generate in this call
+    input_locale TEXT,   -- Locale code (e.g., 'en_US', 'de_DE')
+    page_offset INT      -- Pagination offset (skips N * batch_size)
+)
+RETURNS TABLE (
+    user_num INT, id UUID, full_name TEXT, address TEXT, 
+    phone TEXT, email TEXT, height_cm INT, weight_kg INT, 
+    eye_color TEXT, lat FLOAT, lon FLOAT
+)
+```
+
+## 2. Algorithms & Implementation Details
+
+### A. Deterministic Randomness (The Engine)
+To satisfy the requirement that identical seeds produce identical data, the system does not use the standard `RANDOM()`. Instead, a custom function `get_random_float(seed, step)` was implemented.
+
+*   **Mechanism:** MD5 Hashing.
+*   **Logic:** `Hash = MD5(Seed || '-' || Step_Index)`
+*   **Conversion:** The first 32 bits of the hash are converted to an integer and normalized to a float between `0.0` and `1.0`.
+*   **Result:** Small changes in the seed produce completely different, yet mathematically reproducible, results.
+
+### B. Normal Distribution (Biometrics)
+Physical attributes like **Height** and **Weight** follow a Bell Curve (Normal Distribution), not a flat random distribution.
+
+*   **Algorithm:** **Box-Muller Transform**.
+*   **Implementation:**
+    We generate two uniform random numbers, $u_1$ and $u_2$, and apply the transform:
+    $$Z_0 = \sqrt{-2 \ln(u_1)} \cdot \cos(2\pi u_2)$$
+*   **Application:**
+    *   Height = $175 + (Z_0 \times 10)$
+    *   Weight = $80 + (Z_1 \times 15)$
+
+### C. Spherical Geolocation (Constant PDF)
+Generating random latitude/longitude via standard linear randomness causes clustering at the poles (non-uniform distribution). The requirement was to generate points with a **Constant Probability Density Function (PDF)** across the sphere.
+
+*   **Algorithm:** Inverse Transform Sampling for Sphere Surface.
+*   **Longitude:** Uniform random between $-180$ and $180$.
+*   **Latitude:** Calculated using the arccosine to adjust for the shrinking surface area near poles.
+    $$\text{Latitude} = \arccos(2u - 1) - \frac{\pi}{2}$$
+    *(Where $u$ is a uniform random float between 0 and 1).*
+
+### D. Extensibility & Performance
+*   **Unified Schema:** Instead of separate tables per language, a single `names` table with a `locale` column is used.
+*   **Array-Based Optimization:**
+    To achieve the benchmark of **>5,000 users/second**, the procedure does **not** perform `SELECT` queries inside the generation loop.
+    1.  At the start of the call, all relevant names/cities for the requested locale are loaded into **PostgreSQL Arrays** (`TEXT[]`).
+    2.  Inside the loop, data is retrieved via array indexing: `arr_names[floor(random * size)]`.
+    3.  This reduces Database I/O complexity from $O(N)$ queries to $O(1)$ query per batch.
+
+---
