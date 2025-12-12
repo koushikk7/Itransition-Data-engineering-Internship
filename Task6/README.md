@@ -1,4 +1,4 @@
-# TASk 6's Documentation
+# Task 6's Documentation
 
 ## Overview
 This project is a fast, deterministic fake data generator written entirely as PostgreSQL stored procedures. It creates realistic user profiles (names, addresses, contact info, biometrics, and random geolocations) without any external code. Given the same inputs it always returns the same results.
