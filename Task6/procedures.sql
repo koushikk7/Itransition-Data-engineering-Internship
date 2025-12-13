@@ -93,7 +93,7 @@ BEGIN
     END IF;
 
     FOR i IN 1..batch_size LOOP
-        row_seed := input_seed + page_offset + i;
+        row_seed := (input_seed * 100000) + page_offset + i;
         
         r1 := get_random_float(row_seed, 1);
         r2 := get_random_float(row_seed, 2);
@@ -128,12 +128,10 @@ BEGIN
 
         eye_color := pick_from_array(row_seed, 300, arr_eyes);
 
-        -- EMAIL LOGIC (UPDATED)
         sel_domain := pick_from_array(row_seed, 400, arr_domains);
         r_email_num := get_random_float(row_seed, 405); 
         r_var := get_random_float(row_seed, 406);
 
-        -- Choose base format
         IF r_var < 0.25 THEN
              email := lower(sel_fname) || '.' || lower(sel_lname);
         ELSIF r_var < 0.50 THEN
@@ -144,13 +142,11 @@ BEGIN
              email := lower(substring(sel_fname, 1, 1)) || '.' || lower(sel_lname);
         END IF;
         
-        -- 30% Chance to add a number (70% Chance NO NUMBER)
         IF get_random_float(row_seed, 407) < 0.3 THEN
             email := email || FLOOR(r_email_num * 99 + 1)::TEXT;
         END IF;
 
         email := email || '@' || sel_domain;
-        -- END EMAIL LOGIC
 
         height_cm := 175 + (get_random_normal(row_seed, 7) * 10)::INT;
         weight_kg := 80 + (get_random_normal(row_seed, 8) * 15)::INT;
